@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { MongoDB } from "./Database/config.js";
-// import router from "./Routers/authRouter.js";
+import router from "./Routes/authRouter.js";
 // import router1 from "./Routers/storyRouter.js";
 // import router2 from "./Routers/ratingRouter.js";
 dotenv.config();
@@ -13,7 +13,7 @@ const app = express();
 app.use(express.json());
 app.use(
   cors({
-    origin: "https://book-appgd.netlify.app", 
+    origin: "https://book-appgd.netlify.app",
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   })
@@ -43,16 +43,10 @@ app.get("/", (req, res) => {
 });
 
 // API Routes
-// 
 
-
-
-
-
-
-
+app.use("/api/auth", router);
 
 // Listen
 app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+  console.log(`🚀 Server is running on port ${port}`);
 });
