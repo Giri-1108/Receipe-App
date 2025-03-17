@@ -24,6 +24,12 @@ const authSchema = new mongoose.Schema(
     },
     resetPasswordToken: String, // Token for password reset
     resetPasswordExpire: Date, // Expiration time for the reset token
+    otp: String, // OTP for verification
+    otpExpire: Date, // OTP expiration time
+    isVerified: {
+      type: Boolean,
+      default: false, // Change to true once verified
+    },
   },
   { timestamps: true }
 );

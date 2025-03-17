@@ -91,16 +91,13 @@ export const forgotPassword = async (req, res) => {
         .json({ message: "User with this email does not exist" });
     }
 
-    // Generate reset token
-    const resetToken = crypto.randomBytes(32).toString("hex");
-    const hashedToken = crypto
-      .createHash("sha256")
-      .update(resetToken)
-      .digest("hex");
+    // Generate OTP (6-digit)
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpire = Date.now() + 5 * 60 * 1000; // 5 mins expiry
 
-    // Save the hashed token and expiration date to the user model
-    user.resetPasswordToken = hashedToken;
-    user.resetPasswordExpire = Date.now() + 3600000; // 1 hour
+    // Save OTP & expiry to user model
+    user.otp = otp;
+    user.otpExpire = otpExpire;
     await user.save();
 
     // Check email credentials
@@ -108,7 +105,7 @@ export const forgotPassword = async (req, res) => {
       return res.status(500).json({ message: "Email configuration missing" });
     }
 
-    // Send the reset token via email
+    // Send OTP via email
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
@@ -120,24 +117,68 @@ export const forgotPassword = async (req, res) => {
       },
     });
 
-    const resetLink = `https://book-appgd.netlify.app/reset-password/${resetToken}`;
-
     const mailOptions = {
       to: email,
       from: process.env.EMAIL_USER,
-      subject: "Password Reset Request",
-      text: `You requested a password reset. Click the link below to reset your password:\n\n${resetLink}\n\nThis link will expire in 1 hour.`,
+      subject: "Your Password Reset OTP",
+      text: `Your OTP for password reset is: ${otp}. This OTP is valid for 5 minutes.`,
     };
 
     await transporter.sendMail(mailOptions);
 
-    res.status(200).json({ message: "Password reset link sent to email" });
+    res.status(200).json({ message: "OTP sent to email for verification" });
   } catch (error) {
     res
       .status(500)
-      .json({ message: "Error generating reset token", error: error.message });
+      .json({ message: "Error generating OTP", error: error.message });
   }
 };
+
+//otp verify
+
+export const verifyOtp = async (req, res) => {
+  const { email, otp } = req.body;
+
+  try {
+    const user = await Auth.findOne({ email });
+    if (!user) {
+      return res
+        .status(400)
+        .json({ message: "User with this email does not exist" });
+    }
+
+    // Check OTP & expiration
+    if (user.otp !== otp || user.otpExpire < Date.now()) {
+      return res.status(400).json({ message: "Invalid or expired OTP" });
+    }
+
+    // Generate password reset token
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .digest("hex");
+
+    user.resetPasswordToken = hashedToken;
+    user.resetPasswordExpire = Date.now() + 3600000; // 1 hour expiry
+    user.otp = undefined; // Remove OTP after use
+    user.otpExpire = undefined;
+    await user.save();
+
+    const resetLink = `https://book-appgd.netlify.app/reset-password/${resetToken}`;
+
+    res.status(200).json({
+      message:
+        "OTP verified successfully. Use the reset link to change password.",
+      resetLink,
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error verifying OTP", error: error.message });
+  }
+};
+
 // Reset Password
 
 export const resetPassword = async (req, res) => {
